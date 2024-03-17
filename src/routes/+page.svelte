@@ -205,10 +205,10 @@
                         : ''}"
                 >
                     <h1 class="text-3xl font-bold">
-                        雨 / Ame{dev ? " (Dev)" : ""}
+                        梅雨 / Tsuyu{dev ? " (Dev)" : ""}
                     </h1>
                     {#if dev}
-                        <p>Please enter the URL of your Ame instance.</p>
+                        <p>Please enter the URL of your Tsuyu instance.</p>
                     {:else}
                         <p class="text-wrap w-[75%] leading-tight">
                             Setting a new standard for open-source virtual
@@ -241,7 +241,7 @@
         <div
             class="absolute z-50 flex flex-col top-8 justify-center items-center backdrop-blur-md border-2 align-center border-blue-100 py-2 px-4 rounded-full select-none shadow-lg shadow-blue-300/30"
         >
-            <h1 class="text-xl font-bold">雨 / Ame{dev ? " (Dev)" : ""}</h1>
+            <h1 class="text-xl font-bold">梅雨 / Tsuyu{dev ? " (Dev)" : ""}</h1>
         </div>
         <main
             class="flex flex-grow flex-col items-center lg:w-[50vw] md:w-[70vw] w-[90vw] h-full"
@@ -255,15 +255,15 @@
                 {#if messages.length === 0 && !sendingMessage}
                     <h1 class="text-center text-xl pt-20 hyphens-auto">
                         There are no messages yet. Use the textbox to start
-                        chatting with Ame!
+                        chatting with Tsuyu!
                     </h1>
                     <p class="hyphens-auto">
-                        As a LLaMA-powered chatbot, Ame is highly capable,
+                        As a LLaMA-powered chatbot, Tsuyu is highly capable,
                         performing nearly as well as its closed-source
                         competitors.
                     </p>
                     <p class="hyphens-auto">
-                        Ame is capable of all of the following:
+                        Tsuyu is capable of all of the following:
                     </p>
                     <ul class="mt-[-0.75rem] list-disc list-inside">
                         <li>Processing large amounts of text</li>
@@ -274,10 +274,10 @@
                         <li>And more!</li>
                     </ul>
                     <p class="hyphens-auto">
-                        Please note that the Ame developers are not responsible
+                        Please note that the Tsuyu developers are not responsible
                         for any inaccurate or harmful generations. Since users provide
                         their own models, guardrails are typically personalized,
-                        and not chosen by the Ame team.
+                        and not chosen by the Tsuyu team.
                     </p>
                 {:else}
                     {#each messages as message}
@@ -302,7 +302,7 @@
                                         src="/ame_pfp.jpg"
                                     />
                                     <span class="font-semibold self-center"
-                                        >Ame</span
+                                        >Tsuyu</span
                                     >
                                     <span class="flex-grow"></span>
                                     <button
