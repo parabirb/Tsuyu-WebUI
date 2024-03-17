@@ -11,19 +11,21 @@
     let url = dev ? "http://localhost:8080/" : "/";
     let messages = [];
     let textarea;
+    let socket;
     let container;
     let chunks = [];
     let scrolled = true;
     let mediaRecorder;
     let sendingMessage = false;
     let recordingAudio = false;
+    let streamingStarted = false;
 
     // send message
     async function sendMessage() {
         // set the message
         let message = textarea.value.trim();
-		// return if the message is blank
-		if (message.length === 0) return;
+        // return if the message is blank
+        if (message.length === 0) return;
         // clear the textarea
         textarea.value = "";
         // change the textarea height
@@ -44,7 +46,7 @@
         if (scrolled)
             setTimeout(
                 () => (container.scrollTop = container.scrollTopMax),
-                40,
+                40
             );
         // request a response
         let response = await fetch(`${url}api/v1/text`, {
@@ -54,32 +56,67 @@
         }).then((res) => res.json());
         // turn off sending message
         sendingMessage = false;
+        streamingStarted = false;
         // if tts is enabled, fetch the audio wav and make a blob
-        let blobUrl = await fetch(`${url}ame_speech.wav`)
-            .then((res) => res.blob())
-            .then((blob) => URL.createObjectURL(blob));
-        // add the message
-        messages = [
-            ...messages,
-            {
-                role: "assistant",
-                type: response.tts ? "augmented" : "text",
-                content: response.output,
-                index: messages.length,
-                audio: response.tts ? blobUrl : null,
-            },
-        ];
+        let blobUrl = response.tts
+            ? await fetch(`${url}ame_speech.wav`)
+                  .then((res) => res.blob())
+                  .then((blob) => URL.createObjectURL(blob))
+            : null;
+        // change the last message
+        (messages[messages.length - 1].type = response.tts
+            ? "augmented"
+            : "text"),
+            (messages[messages.length - 1].content = response.output),
+            (messages[messages.length - 1].audio = response.tts
+                ? blobUrl
+                : null);
+        // reload the messages array
+        messages = [...messages];
         // if we were scrolled to the bottom
         if (scrolled)
             setTimeout(
                 () => (container.scrollTop = container.scrollTopMax),
-                40,
+                40
             );
     }
 
     // connect to the server
     async function connect() {
+        // set state to connected
         state = "connected";
+        // connect to the socket
+        socket = new EventSource(`${url}api/v1/sse`);
+        // on chunk
+        socket.onmessage = (msg) => {
+            // parse the data
+            let data = JSON.parse(msg.data);
+            // if this is the start of a new ai message
+            if (messages[messages.length - 1].role === "user") {
+                // add the new message
+                messages.push({
+                    role: "assistant",
+                    type: "text",
+                    content: data,
+                    index: messages.length,
+                });
+                streamingStarted = true;
+                if (scrolled)
+                    setTimeout(
+                        () => (container.scrollTop = container.scrollTopMax),
+                        20
+                    );
+            }
+            // otherwise
+            else {
+                messages[messages.length - 1].content += data;
+                if (scrolled)
+                    setTimeout(
+                        () => (container.scrollTop = container.scrollTopMax),
+                        20
+                    );
+            }
+        };
     }
 
     // start recording
@@ -111,7 +148,7 @@
             await navigator.mediaDevices.getUserMedia({ audio: true }),
             {
                 mimeType: "audio/webm",
-            },
+            }
         );
         // when we stop recording
         mediaRecorder.ondataavailable = async (e) => {
@@ -136,7 +173,7 @@
                 if (scrolled)
                     setTimeout(
                         () => (container.scrollTop = container.scrollTopMax),
-                        40,
+                        40
                     );
                 // make a formdata thing and add the recording
                 let formData = new FormData();
@@ -148,29 +185,31 @@
                 }).then((res) => res.json());
                 // turn off sending message
                 sendingMessage = false;
+                streamingStarted = false;
                 // if tts is enabled, fetch the audio wav and make a blob
-                let blobUrl = await fetch(`${url}ame_speech.wav`)
-                    .then((res) => res.blob())
-                    .then((blob) => URL.createObjectURL(blob));
+                let blobUrl = response.tts
+                    ? await fetch(`${url}ame_speech.wav`)
+                          .then((res) => res.blob())
+                          .then((blob) => URL.createObjectURL(blob))
+                    : null;
                 // modify the last message
-                messages[messages.length - 1].type = "augmented";
-                messages[messages.length - 1].content = response.input;
-                // add the message
-                messages = [
-                    ...messages,
-                    {
-                        role: "assistant",
-                        type: response.tts ? "augmented" : "text",
-                        content: response.output,
-                        index: messages.length,
-                        audio: response.tts ? blobUrl : null,
-                    },
-                ];
+                messages[messages.length - 2].type = "augmented";
+                messages[messages.length - 2].content = response.input;
+                // change the last message
+                (messages[messages.length - 1].type = response.tts
+                    ? "augmented"
+                    : "text"),
+                    (messages[messages.length - 1].content = response.output),
+                    (messages[messages.length - 1].audio = response.tts
+                        ? blobUrl
+                        : null);
+                // reload the messages array
+                messages = [...messages];
                 // if we were scrolled to the bottom
                 if (scrolled)
                     setTimeout(
                         () => (container.scrollTop = container.scrollTopMax),
-                        40,
+                        40
                     );
             }
             // reset canceled
@@ -274,10 +313,11 @@
                         <li>And more!</li>
                     </ul>
                     <p class="hyphens-auto">
-                        Please note that the Tsuyu developers are not responsible
-                        for any inaccurate or harmful generations. Since users provide
-                        their own models, guardrails are typically personalized,
-                        and not chosen by the Tsuyu team.
+                        Please note that the Tsuyu developers are not
+                        responsible for any inaccurate or harmful generations.
+                        Since users provide their own models, guardrails are
+                        typically personalized, and not chosen by the Tsuyu
+                        team.
                     </p>
                 {:else}
                     {#each messages as message}
@@ -309,7 +349,7 @@
                                         class="self-center align-middle hover:text-slate-400 transition-colors ease-in-out duration-200"
                                         on:click={() => {
                                             navigator.clipboard.writeText(
-                                                message.content,
+                                                message.content
                                             );
                                             message.copyButton.innerText =
                                                 "done";
@@ -317,7 +357,7 @@
                                                 () =>
                                                     (message.copyButton.innerText =
                                                         "content_copy"),
-                                                2000,
+                                                2000
                                             );
                                         }}
                                     >
@@ -361,7 +401,7 @@
                         </div>
                     {/each}
                 {/if}
-                {#if sendingMessage}
+                {#if sendingMessage && !streamingStarted}
                     <div class="align-middle">
                         <img
                             class="h-16 w-16 rounded-full inline"
