@@ -219,7 +219,7 @@
         };
     });
 
-    $: if (messages.length !== 0) setTimeout(hljs.highlightAll, 20);
+    $: if (messages.length !== 0 && !streamingStarted) setTimeout(hljs.highlightAll, 20);
 
     function processScroll() {
         scrolled = container.scrollTop === container.scrollTopMax;
