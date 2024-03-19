@@ -10,6 +10,8 @@
     let state = null;
     let url = dev ? "http://localhost:8080/" : "/";
     let messages = [];
+    let files = [];
+    let filePicker;
     let textarea;
     let socket;
     let container;
@@ -26,6 +28,16 @@
         let message = textarea.value.trim();
         // return if the message is blank
         if (message.length === 0) return;
+        // if we got an image, save it
+        let image;
+        let form;
+        if (files.length !== 0) {
+            image = files[0];
+            form = new FormData();
+            form.append("image", image);
+            form.append("input", message);
+            files = [];
+        }
         // clear the textarea
         textarea.value = "";
         // change the textarea height
@@ -34,14 +46,24 @@
         // set sending message to true
         sendingMessage = true;
         // change the messages array
-        messages = [
-            ...messages,
-            {
-                role: "user",
-                type: "text",
-                content: message,
-            },
-        ];
+        messages = image
+            ? [
+                  ...messages,
+                  {
+                      role: "user",
+                      type: "image",
+                      content: message,
+                      image: URL.createObjectURL(image),
+                  },
+              ]
+            : [
+                  ...messages,
+                  {
+                      role: "user",
+                      type: "text",
+                      content: message,
+                  },
+              ];
         // if we were scrolled to the bottom
         if (scrolled)
             setTimeout(
@@ -49,11 +71,16 @@
                 40
             );
         // request a response
-        let response = await fetch(`${url}api/v1/text`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ input: message }),
-        }).then((res) => res.json());
+        let response = image
+            ? await fetch(`${url}api/v1/vision`, {
+                  method: "POST",
+                  body: form,
+              }).then((res) => res.json())
+            : await fetch(`${url}api/v1/text`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ input: message }),
+              }).then((res) => res.json());
         // turn off sending message
         sendingMessage = false;
         streamingStarted = false;
@@ -219,7 +246,8 @@
         };
     });
 
-    $: if (messages.length !== 0 && !streamingStarted) setTimeout(hljs.highlightAll, 20);
+    $: if (messages.length !== 0 && !streamingStarted)
+        setTimeout(hljs.highlightAll, 20);
 
     function processScroll() {
         scrolled = container.scrollTop === container.scrollTopMax;
@@ -380,7 +408,7 @@
                                     }}
                                 />
                             {/if}
-                            {#if message.type !== "text"}
+                            {#if message.type === "augmented" || message.type === "audio"}
                                 <audio
                                     controls
                                     autoplay={messages.length - 1 ===
@@ -397,6 +425,14 @@
                                     Your browser does not support audio. Please get
                                     one that does.
                                 </audio>
+                            {/if}
+                            {#if message.type === "image"}
+                                <a target="_blank" href={message.image}>
+                                    <img
+                                        class="w-24 h-24 object-cover rounded-xl"
+                                        src={message.image}
+                                    />
+                                </a>
                             {/if}
                         </div>
                     {/each}
@@ -416,66 +452,105 @@
             </div>
         </main>
         <div
-            class="absolute bottom-8 lg:w-[48vw] md:w-[68vw] w-[88vw] flex {recordingAudio
-                ? 'justify-center p-4 backdrop-blur-md bg-transparent border-2 border-blue-100 rounded-3xl'
-                : ''} gap-2"
+            class="absolute bottom-8 lg:w-[48vw] md:w-[68vw] w-[88vw] flex flex-col gap-4"
         >
-            {#if !recordingAudio}
-                <textarea
-                    autofocus
-                    rows="1"
-                    style="height: auto"
-                    placeholder="Input a message..."
-                    class="flex-grow backdrop-blur-md bg-transparent border-2 border-blue-100 p-4 align-middle rounded-3xl focus:outline-none focus:shadow-lg hover:shadow-lg hover:shadow-blue-200/30 focus:shadow-blue-200/30 transition-shadow ease-in-out duration-200"
-                    bind:this={textarea}
-                    on:input={() => {
-                        textarea.style.height = "auto";
-                        textarea.style.height = `${textarea.scrollHeight + 4}px`;
-                    }}
-                    on:keydown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            sendMessage();
-                        }
-                    }}
-                    disabled={sendingMessage ? "disabled" : undefined}
-                />
-                <button
-                    class="hover:text-slate-400 transition-colors ease-in-out duration-200"
-                    on:click={startRecording}
-                    disabled={sendingMessage ? "disabled" : undefined}
-                >
-                    <span class="material-icons">mic</span>
-                </button>
-            {:else}
-                <div
-                    class="flex w-full gap-4 place-items-center justify-center"
-                >
-                    <div class="flex gap-2 justify-center align-middle">
+            {#each files as file}
+                <div class="w-24 h-24">
+                    <img
+                        class="object-cover rounded-xl w-full h-full"
+                        src={URL.createObjectURL(file)}
+                    />
+                    <button
+                        class="absolute rounded-full left-20 -top-1.5"
+                        on:click={() => (files = [])}
+                    >
                         <span
-                            class="align-middle material-icons text-red-500 animate-pulse select-none"
-                            >mic</span
+                            class="material-icons hover:text-slate-400 transition-colors ease-in-out duration-200"
+                            >cancel</span
                         >
-                        <span class="align-middle text-red-500 font-semibold"
-                            >Recording...</span
-                        >
-                    </div>
-                    <button
-                        class="bg-blue-200 text-ame px-4 h-10 align-middle rounded-full hover:shadow-lg hover:shadow-blue-200/30 transition-shadow ease-in-out duration-200"
-                        on:click={cancelRecording}
-                    >
-                        <span class="material-icons align-middle">cancel</span>
-                        <span class="align-middle">Cancel</span>
-                    </button>
-                    <button
-                        class="bg-blue-200 text-ame px-4 h-10 align-middle rounded-full hover:shadow-lg hover:shadow-blue-200/30 transition-shadow ease-in-out duration-200"
-                        on:click={sendRecording}
-                    >
-                        <span class="material-icons align-middle">send</span>
-                        <span class="align-middle">Send</span>
                     </button>
                 </div>
-            {/if}
+            {/each}
+            <div
+                class="{recordingAudio
+                    ? 'justify-center p-4 backdrop-blur-md bg-transparent border-2 border-blue-100 rounded-3xl'
+                    : ''} flex gap-2"
+            >
+                {#if !recordingAudio}
+                    <textarea
+                        autofocus
+                        rows="1"
+                        style="height: auto"
+                        placeholder="Input a message..."
+                        class="flex-grow backdrop-blur-md bg-transparent border-2 border-blue-100 p-4 align-middle rounded-3xl focus:outline-none focus:shadow-lg hover:shadow-lg hover:shadow-blue-200/30 focus:shadow-blue-200/30 transition-shadow ease-in-out duration-200"
+                        bind:this={textarea}
+                        on:input={() => {
+                            textarea.style.height = "auto";
+                            textarea.style.height = `${textarea.scrollHeight + 4}px`;
+                        }}
+                        on:keydown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                sendMessage();
+                            }
+                        }}
+                        disabled={sendingMessage ? "disabled" : undefined}
+                    />
+                    <button
+                        class="hover:text-slate-400 transition-colors ease-in-out duration-200"
+                        on:click={startRecording}
+                        disabled={sendingMessage ? "disabled" : undefined}
+                    >
+                        <span class="material-icons">mic</span>
+                    </button>
+                    <input
+                        bind:files
+                        bind:this={filePicker}
+                        type="file"
+                        accept="image/*"
+                        class="hidden"
+                    />
+                    <button
+                        class="hover:text-slate-400 transition-colors ease-in-out duration-200"
+                        on:click={filePicker.click()}
+                        disabled={files.length !== 0 ? "disabled" : undefined}
+                    >
+                        <span class="material-icons">add_photo_alternate</span>
+                    </button>
+                {:else}
+                    <div
+                        class="flex w-full gap-4 place-items-center justify-center"
+                    >
+                        <div class="flex gap-2 justify-center align-middle">
+                            <span
+                                class="align-middle material-icons text-red-500 animate-pulse select-none"
+                                >mic</span
+                            >
+                            <span
+                                class="align-middle text-red-500 font-semibold"
+                                >Recording...</span
+                            >
+                        </div>
+                        <button
+                            class="bg-blue-200 text-ame px-4 h-10 align-middle rounded-full hover:shadow-lg hover:shadow-blue-200/30 transition-shadow ease-in-out duration-200"
+                            on:click={cancelRecording}
+                        >
+                            <span class="material-icons align-middle"
+                                >cancel</span
+                            >
+                            <span class="align-middle">Cancel</span>
+                        </button>
+                        <button
+                            class="bg-blue-200 text-ame px-4 h-10 align-middle rounded-full hover:shadow-lg hover:shadow-blue-200/30 transition-shadow ease-in-out duration-200"
+                            on:click={sendRecording}
+                        >
+                            <span class="material-icons align-middle">send</span
+                            >
+                            <span class="align-middle">Send</span>
+                        </button>
+                    </div>
+                {/if}
+            </div>
         </div>
     {/if}
 </div>
